@@ -1,0 +1,194 @@
+---
+title: "STAT 4355 Project"
+author: "Sejal Patel"
+date: "2024-04-17"
+output: pdf_document
+---
+## STAT 4355 Project
+### Group: Snooze Stats
+
+```{r}
+# Load necessary libraries
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+if (!require(ggpubr)) install.packages("ggpubr")
+library(ggpubr)
+library(viridis)
+
+
+sleep_data <- read.csv("sleep.csv")
+
+# ***************************************************
+#                   CLEANING DATA                   *
+# ***************************************************
+
+# Getting rid of PersonID column
+sleep <- select(sleep_data, -1)
+# View(sleep)
+
+# Renaming columns
+colnames(sleep) <- c("Gender", "Age", "Occupation", "Sleep_Duration", "Sleep_Quality", "Physical_Activity", "Stress_Level", "BMI_Category", "BP", "Heart_Rate", "Daily_Steps", "Sleep_Disorder")
+
+# Changing "Normal Weight" to "Normal" in BMI column
+sleep$BMI_Category[which(sleep$BMI_Category == "Normal Weight")] <- "Normal"
+
+# checking for NAs
+sum(is.na(sleep))
+# _____________________________________________________________________________________________________________________
+
+# Convert Age to categorical variable 
+sleep$Age_Group <- cut(sleep$Age, breaks = c(0, 18, 35, 50, 65, 100), labels = c("Under 18", "18-35", "35-50", "50-65", "65+"))
+
+# ------------------------------------ BAR PLOTS ------------------------------------ 
+# Bar Plot for Gender vs. Sleep Duration
+ggplot(sleep, aes(x = Gender, y = Sleep_Duration, fill = Gender)) +
+  geom_bar(stat = "summary", fun = "mean") +
+  labs(title = "Average Sleep Duration by Gender", x = "Gender", y = "Average Sleep Duration (hours)")
+
+
+# Bar Plot for Occupation vs. Sleep Duration
+ggplot(sleep, aes(x = Occupation, y = Sleep_Duration, fill = Occupation)) +
+  geom_bar(stat = "summary", fun = "mean") +  
+  scale_fill_viridis(discrete = TRUE, option = "D") +  # Use the 'D' option for discrete color scale
+  labs(title = "Average Sleep Duration by Occupation", x = "Occupation", y = "Average Sleep Duration (hours)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+# ------------------------------------ SCATTER PLOTS ------------------------------------ 
+# Scatter Plot for Age vs. Sleep Duration
+ggplot(sleep, aes(x = Age, y = Sleep_Duration)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Sleep Duration vs Age", x = "Age", y = "Sleep Duration (hours)")
+
+# Scatter Plot for Age vs. Sleep Quality
+ggplot(sleep, aes(x = Age, y = Sleep_Quality)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Sleep Quality vs Age", x = "Age", y = "Sleep Quality")
+
+
+# ------------------------------------ HISTOGRAMS ------------------------------------ 
+# Histogram for Age
+ggplot(sleep, aes(x = Age)) +
+  geom_histogram(bins = 30, fill = "cornflowerblue", color = "black") +
+  labs(title = "Histogram of Age", x = "Age", y = "Frequency")
+
+# Histogram for Sleep Duration based on age and gender
+ggplot(sleep, aes(x=Age, fill= Gender)) +
+  geom_bar() +
+    labs (title = "Histogram of Sleep Duration on Age & Gender", x = "Age", y = "Frequency") +
+    scale_y_continuous(expand = c(0,0), limits = c(0,40), breaks = seq(0, 40, 10)) 
+
+
+
+# ------------------------------------ BOX PLOTS ------------------------------------ 
+# Boxplot for Sleep Duration by Gender
+ggplot(sleep, aes(x = Gender, y = Sleep_Duration, fill = Gender)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Sleep Duration by Gender", x = "Gender", y = "Sleep Duration (hours)")
+
+# Boxplot for Sleep Quality by Gender
+ggplot(sleep, aes(x = Gender, y = Sleep_Quality, fill = Gender)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Sleep Quality by Gender", x = "Gender", y = "Sleep Quality")
+
+# Turn age into a categorible variables by setting age ranges (under 20, 30-39, 40-49, 50-59, 60+) and use this data to add to the box plot 
+# Use a function to categorize each observation into an age range and make the box plot
+
+# Categorizing age into groups
+sleep <- sleep %>%
+  mutate(Age_Group = cut(Age,
+                         breaks = c(-Inf, 20, 30, 40, 50, 60, Inf),
+                         labels = c("Under 20", "20-29", "30-39", "40-49", "50-59", "60+"),
+                         right = FALSE))
+
+# Creating a box plot for Sleep Duration by Age Group
+ggplot(sleep, aes(x = Age_Group, y = Sleep_Duration, fill = Age_Group)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Sleep Duration by Age Group",
+       x = "Age Group",
+       y = "Sleep Duration (hours)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  
+        legend.position = "none") 
+
+ggplot(sleep, aes(x = reorder(Occupation, -Sleep_Duration, FUN = mean), y = Sleep_Duration, fill = Occupation)) +
+  geom_bar(stat = "summary", fun = "mean") +
+  scale_fill_viridis(discrete = TRUE, option = "D") +  # Use the 'D' option for discrete color scale
+  labs(title = "Average Sleep Duration by Occupation", x = "Occupation", y = "Average Sleep Duration (hours)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+qq_plot <- function(data, variable, title) {
+  qq_data <- qqnorm(data[[variable]], plot.it = FALSE)
+  df <- data.frame(Theoretical = qq_data$x, Sample = qq_data$y)
+  p <- ggplot(df, aes(sample = Sample)) +
+    stat_qq() +
+    stat_qq_line(color = "steelblue", linewidth = 1) +  # Update to 'linewidth'
+    labs(title = title, x = "Theoretical Quantiles", y = "Sample Quantiles") +
+    theme_minimal()
+  return(p)
+}
+
+# Create QQ plots
+qq_sleep_duration <- qq_plot(sleep, "Sleep_Duration", "QQ Plot for Sleep Duration")
+
+ggarrange(qq_sleep_duration)
+
+
+
+
+
+```
+
+```{r}
+sleep <- sleep %>%
+  mutate(Age_Group = cut(Age,
+                         breaks = c(-Inf, 20, 30, 40, 50, 60, Inf),
+                         labels = c("Under 20", "20_29", "30_39", "40_49", "50_59", "60+"),
+                         right = FALSE),
+         Gender = as.factor(Gender),
+         Occupation = as.factor(Occupation),
+         BMI_Category = as.factor(BMI_Category))
+
+# Blood Pressure might need to be split or used as is, depending on how it's currently formatted.
+# Assuming 'BP' is something like '120/80', we'll split it and convert to numeric:
+sleep <- sleep %>%
+  separate(BP, into = c("Systolic_BP", "Diastolic_BP"), sep = "/", convert = TRUE)
+
+# Build the model
+model <- lm(Sleep_Duration ~ Gender + Age_Group + Occupation + Physical_Activity + 
+            Stress_Level + BMI_Category + Systolic_BP + Diastolic_BP + Heart_Rate + Daily_Steps, data = sleep)
+
+# Fit the full model
+full_model <- lm(Sleep_Duration ~ Gender + Age_Group + Occupation + 
+                 Physical_Activity + Stress_Level + BMI_Category + 
+                 Systolic_BP + Diastolic_BP + Heart_Rate + Daily_Steps, data = sleep)
+
+# View the summary to decide which variables to remove
+summary(full_model)
+
+
+
+
+
+# Automated stepwise model selection based on AIC
+stepwise_model <- step(full_model, direction = "both")
+
+# View the summary of the stepwise-selected model
+summary(stepwise_model)
+
+
+
+
+
+```
+
+
+
+
+
+```

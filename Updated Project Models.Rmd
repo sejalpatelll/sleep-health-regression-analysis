@@ -1,0 +1,191 @@
+---
+title: "Sleep Project"
+author: "Sejal Patel"
+date: "2024-04-27"
+output: pdf_document
+---
+
+```{r}
+
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+library(MASS)
+library(glmnet)
+library(olsrr) 
+
+if (!requireNamespace("janitor", quietly = TRUE))
+    install.packages("janitor")
+library(janitor)
+
+if (!requireNamespace("DataExplorer", quietly = TRUE))
+    install.packages("DataExplorer")
+library(DataExplorer)
+
+if (!requireNamespace("car", quietly = TRUE))
+    install.packages("car")
+library(car)
+
+Sleep_health_and_lifestyle_dataset <- read.csv("sleep.csv")
+
+# ***************************************************
+#                   CLEANING DATA                   *
+# ***************************************************
+
+# Getting rid of PersonID column
+sleep <- Sleep_health_and_lifestyle_dataset[, -1]
+
+
+# Renaming columns
+colnames(sleep) <- c("Gender", "Age", "Occupation", "Sleep_Duration", "Sleep_Quality", "Physical_Activity", "Stress_Level", "BMI_Category", "BP", "Heart_Rate", "Daily_Steps", "Sleep_Disorder")
+
+# Changing "Normal Weight" to "Normal" in BMI column
+sleep$BMI_Category[which(sleep$BMI_Category == "Normal Weight")] <- "Normal"
+
+# checking for NAs
+sum(is.na(sleep))
+is.na(sleep)
+
+
+# ***************************************************
+#                   DUMMY VARIABLES                 *
+# ***************************************************
+
+# Data preparation:
+
+sleep %>% 
+  clean_names() %>% 
+  glimpse()
+
+# Now you can use the introduce() function
+introduce(sleep)
+
+
+#checking for duplicates and na
+sum(duplicated(sleep))
+sum(is.na(sleep))
+
+# separate() to split column blood_pressure
+sleep <- separate(sleep, BP, into = c("systolic", "diastolic"), sep = "/")
+sleep$systolic <- as.numeric(sleep$systolic)
+sleep$diastolic <- as.numeric(sleep$diastolic)
+
+# ************************************************
+#                         MODEL                  *
+# ************************************************
+
+y <- sleep$Sleep_Duration
+x1 <- sleep$Gender
+x2 <- sleep$Age
+x3 <- sleep$Occupation
+x4 <- sleep$Sleep_Quality
+x5 <- sleep$Physical_Activity
+x6 <- sleep$Stress_Level
+x7 <- sleep$BMI_Category
+x81 <- sleep$systolic
+x82 <- sleep$diastolic
+x9 <- sleep$Heart_Rate
+x10 <- sleep$Daily_Steps
+x11 <- sleep$Sleep_Disorder
+
+# turning categorical variables into factors so we can use in model
+sleep <- sleep %>%
+  mutate_at(vars(Gender, Occupation, BMI_Category, Sleep_Disorder), as.factor) %>%
+  mutate_if(is.integer, as.numeric)
+  
+
+# sleep duration is response var, using rest of the vars as predictors
+full_model <- lm(Sleep_Duration ~ Age + Sleep_Quality + Physical_Activity + Stress_Level + Heart_Rate + Daily_Steps + Gender + Occupation + BMI_Category + systolic + diastolic + Sleep_Disorder, data = sleep)
+summary(full_model)
+
+
+#deciding to remove certian vars
+vif(full_model)
+full_model <- lm(Sleep_Duration ~ Age + Sleep_Quality + Physical_Activity + Stress_Level + Heart_Rate + Daily_Steps + Gender + Occupation + BMI_Category + systolic + Sleep_Disorder, data = sleep)
+
+# slide 22 Lecture 10
+fit0 <- lm(Sleep_Duration~1, data = sleep)
+
+
+#forward --- only removed 2 variables
+reduced_model <- stepAIC(fit0, direction = "forward", scope=list(lower=fit0, upper=full_model))
+
+reduced_model <- stepAIC(full_model, direction = "backward")
+
+reduced_model <- stepAIC(fit0, direction = "both", scope=list(lower=fit0, upper=full_model))
+
+summary(reduced_model)
+
+# can run lasso for simpler model, different hyperparam.
+# table on report
+x=sleep[, c(1:3, 5:13)]
+x = as.matrix(x)
+y=sleep[,"Sleep_Duration"]
+lambdas <- 10^seq(2, -3, by=-.1)
+
+
+
+lasso_reg <- cv.glmnet(x, y, alpha=1, lambda=lambdas, standardize=TRUE, nfolds=3)
+lasso_reg$lambda.min 
+
+lasso_model <- glmnet(x, y, alpha=1, lambda=0.001, standardize=TRUE)
+
+# . means its close to 0, choose the rest
+# lasso can reduce coeff to zero unlike other ridge
+lasso_model$beta
+# compare with aic
+
+
+
+
+
+
+
+# best subset selection LEcture notes page 17
+
+
+### fit the linear model all subset selection 
+ms_all=ols_step_all_possible(full_model) 
+
+ms_all[which.max(ms_all$result$adjr)] 
+
+
+
+result=ms_all$result
+result[2036,]
+
+
+#stepwise with p-values 
+ols_step_forward_p(full_model) 
+
+ols_step_backward_p(full_model)
+
+# each model corresponds to the models from the stepAIC forward
+# can compare anova with forward variable selection w table
+
+
+anova(lm(Sleep_Duration ~ 1, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity + Gender, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity + Gender + Daily_Steps, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity + Gender + Daily_Steps + Heart_Rate, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity + Gender + Daily_Steps + Heart_Rate + Stress_Level, data = sleep),
+      lm(Sleep_Duration ~ Sleep_Quality + systolic + diastolic + Occupation + Physical_Activity + Gender + Daily_Steps + Heart_Rate + Stress_Level + Sleep_Disorder, data = sleep))
+
+### not sure how to resolve the errors when line 110 is run
+# looking for larger values --> variable is problematic
+#make scatter plot of rleated vars
+vif(reduced_model)
+
+
+
+
+
+
+
+```
+
+
